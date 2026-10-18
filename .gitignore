@@ -1,0 +1,13 @@
+# Локальные настройки Xcode и служебные файлы macOS.
+xcuserdata/
+DerivedData/
+build/
+.DS_Store
+*.xcuserstate
+
+# Выпускаемые файлы публикуются отдельно через GitHub Releases.
+release/
+*.dmg
+
+# В релизный пакет они добавляются скриптом, а в исходный код не попадают.
+VIDLOAD/Resources/VIDLOADTools.bundle/
