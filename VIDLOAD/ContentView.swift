@@ -12,20 +12,29 @@ struct ContentView: View {
     @State private var useSafariSession = false
     @State private var isPrivacyInfoPresented = false
     @AppStorage("VIDLOAD.hasSeenPrivacyInfo") private var hasSeenPrivacyInfo = false
+    @AppStorage("VIDLOAD.language") private var languageRawValue = AppLanguage.russian.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: languageRawValue) ?? .russian
+    }
+
+    private func text(_ russian: String, _ english: String) -> String {
+        language.text(russian, english)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
 
             Form {
-                Section("Новая загрузка") {
+                Section {
                     HStack(spacing: 10) {
-                        TextField("Вставьте ссылку", text: $link)
+                        TextField(text("Вставьте ссылку", "Paste a link"), text: $link)
                             .textFieldStyle(.roundedBorder)
 
-                        Picker("Формат", selection: $selectedFormat) {
+                        Picker(text("Формат", "Format"), selection: $selectedFormat) {
                             ForEach(DownloadFormat.allCases) { format in
-                                Text(format.shortTitle).tag(format)
+                                Text(format.shortTitle(in: language)).tag(format)
                             }
                         }
                         .labelsHidden()
@@ -35,30 +44,35 @@ struct ContentView: View {
                         downloadButton
                     }
 
-                    Text("Вставьте ссылку и нажмите «Скачать». Поддерживаются публичные видео YouTube и Instagram.")
+                    Text(text(
+                        "Вставьте ссылку и нажмите «Скачать». Поддерживаются публичные видео YouTube и Instagram.",
+                        "Paste a link and click Download. Public YouTube and Instagram videos are supported."
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text(selectedFormat.helperText)
+                    Text(selectedFormat.helperText(in: language))
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
                     progressSection
 
                     HStack {
-                        Button("Проверить инструменты") { downloadManager.refreshDependencies() }
+                        Button(text("Проверить инструменты", "Check tools")) { downloadManager.refreshDependencies() }
                             .disabled(downloadManager.isDownloading)
 
                         if let outputFile = downloadManager.lastOutputFile {
-                            Button("Показать в Finder") { downloadManager.reveal(outputFile) }
+                            Button(text("Показать в Finder", "Show in Finder")) { downloadManager.reveal(outputFile) }
                         }
                     }
+                } header: {
+                    Text(text("Новая загрузка", "New download"))
                 }
 
-                Section("Сохранение") {
+                Section {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Папка загрузки")
+                            Text(text("Папка загрузки", "Download folder"))
                             Text(downloadManager.destinationURL.path)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -66,24 +80,34 @@ struct ContentView: View {
                                 .truncationMode(.middle)
                         }
                         Spacer()
-                        Button("Изменить…") { downloadManager.chooseDestination() }
+                        Button(text("Изменить…", "Change…")) { downloadManager.chooseDestination() }
                     }
+                } header: {
+                    Text(text("Сохранение", "Saving"))
                 }
 
-                Section("Сессия Safari") {
-                    Toggle("Использовать текущую сессию Safari", isOn: $useSafariSession)
-                    Text("Опция используется только для YouTube и Instagram. Cookie из Safari не сохраняются и передаются только соответствующему сервису через yt-dlp для этой загрузки.")
+                Section {
+                    Toggle(text("Использовать текущую сессию Safari", "Use current Safari session"), isOn: $useSafariSession)
+                    Text(text(
+                        "Опция используется только для YouTube и Instagram. Cookie из Safari не сохраняются и передаются только соответствующему сервису через yt-dlp для этой загрузки.",
+                        "This option is used only for YouTube and Instagram. Safari cookies are not saved and are sent only to the matching service through yt-dlp for this download."
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } header: {
+                    Text(text("Сессия Safari", "Safari session"))
                 }
 
-                Section("Инструменты") {
-                    DependencyRow(name: "yt-dlp", tool: downloadManager.dependencies.ytDlp)
-                    DependencyRow(name: "FFmpeg", tool: downloadManager.dependencies.ffmpeg)
+                Section {
+                    DependencyRow(name: "yt-dlp", tool: downloadManager.dependencies.ytDlp, language: language)
+                    DependencyRow(name: "FFmpeg", tool: downloadManager.dependencies.ffmpeg, language: language)
 
                     if !downloadManager.dependencies.isReady {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Встроенные инструменты не найдены. Для разработки можно установить их в Терминале:")
+                            Text(text(
+                                "Встроенные инструменты не найдены. Для разработки можно установить их в Терминале:",
+                                "Built-in tools were not found. For development, install them in Terminal:"
+                            ))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             HStack {
@@ -91,18 +115,22 @@ struct ContentView: View {
                                     .font(.system(.body, design: .monospaced))
                                     .textSelection(.enabled)
                                 Spacer()
-                                Button("Скопировать") { downloadManager.copyInstallCommand() }
+                                Button(text("Скопировать", "Copy")) { downloadManager.copyInstallCommand() }
                             }
                         }
                     }
+                } header: {
+                    Text(text("Инструменты", "Tools"))
                 }
 
                 if !downloadManager.logLines.isEmpty {
-                    Section("Последние сообщения") {
+                    Section {
                         Text(downloadManager.logLines.joined(separator: "\n"))
                             .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
                             .foregroundStyle(.secondary)
+                    } header: {
+                        Text(text("Последние сообщения", "Latest messages"))
                     }
                 }
             }
@@ -110,6 +138,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 720, minHeight: 610)
         .onAppear {
+            downloadManager.setLanguage(language)
             downloadManager.refreshDependencies()
             if !hasSeenPrivacyInfo {
                 isPrivacyInfoPresented = true
@@ -118,7 +147,10 @@ struct ContentView: View {
         .sheet(isPresented: $isPrivacyInfoPresented, onDismiss: {
             hasSeenPrivacyInfo = true
         }) {
-            PrivacyInfoSheet(isPresented: $isPrivacyInfoPresented)
+            PrivacyInfoSheet(language: language, isPresented: $isPrivacyInfoPresented)
+        }
+        .onChange(of: languageRawValue) { _, _ in
+            downloadManager.setLanguage(language)
         }
     }
 
@@ -135,7 +167,9 @@ struct ContentView: View {
             }
         } label: {
             Label(
-                downloadManager.isDownloading ? "Отменить" : "Скачать",
+                downloadManager.isDownloading
+                    ? text("Отменить", "Cancel")
+                    : text("Скачать", "Download"),
                 systemImage: downloadManager.isDownloading ? "stop.fill" : "arrow.down.circle.fill"
             )
         }
@@ -150,17 +184,24 @@ struct ContentView: View {
                 .foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
                 Text("VIDLOAD").font(.title2.bold())
-                Text("Сохраняйте разрешённые публичные видео на Mac")
+                Text(text("Сохраняйте разрешённые публичные видео на Mac", "Save permitted public videos on your Mac"))
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Picker("Language", selection: $languageRawValue) {
+                Text("RU").tag(AppLanguage.russian.rawValue)
+                Text("EN").tag(AppLanguage.english.rawValue)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 82)
             Button {
                 isPrivacyInfoPresented = true
             } label: {
                 Image(systemName: "info.circle")
             }
             .buttonStyle(.plain)
-            .help("Как VIDLOAD использует сессию Safari")
+            .help(text("Как VIDLOAD использует сессию Safari", "How VIDLOAD uses the Safari session"))
         }
         .padding(20)
         .background(.bar)
@@ -170,7 +211,7 @@ struct ContentView: View {
     private var progressSection: some View {
         if downloadManager.isDownloading {
             VStack(alignment: .leading, spacing: 6) {
-                Text(downloadManager.stage.title)
+                Text(downloadManager.stage.title(in: language))
                     .font(.headline)
                 if downloadManager.stage.usesIndeterminateProgress {
                     HStack(spacing: 8) {
@@ -199,37 +240,51 @@ struct ContentView: View {
 }
 
 private struct PrivacyInfoSheet: View {
+    let language: AppLanguage
     @Binding var isPresented: Bool
+
+    private func text(_ russian: String, _ english: String) -> String {
+        language.text(russian, english)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Label("Прозрачность и разрешения", systemImage: "hand.raised.fill")
+            Label(text("Прозрачность и разрешения", "Transparency and permissions"), systemImage: "hand.raised.fill")
                 .font(.title2.bold())
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("Что скачивает VIDLOAD", systemImage: "arrow.down.circle.fill")
+                Label(text("Что скачивает VIDLOAD", "What VIDLOAD downloads"), systemImage: "arrow.down.circle.fill")
                     .font(.headline)
-                Text("Только материалы по вставленной вами публичной ссылке. Скачивайте собственные материалы или материалы, на которые у вас есть разрешение.")
+                Text(text(
+                    "Только материалы по вставленной вами публичной ссылке. Скачивайте собственные материалы или материалы, на которые у вас есть разрешение.",
+                    "Only material from the public link you paste. Download your own material or material you are allowed to download."
+                ))
                     .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("Зачем нужен полный доступ к диску", systemImage: "externaldrive.fill")
+                Label(text("Зачем нужен полный доступ к диску", "Why Full Disk Access is needed"), systemImage: "externaldrive.fill")
                     .font(.headline)
-                Text("Он нужен только если включить сессию Safari: macOS защищает файл cookie браузера. Разрешение широкое, поэтому включайте его лишь для этой локальной сборки, которой доверяете.")
+                Text(text(
+                    "Он нужен только если включить сессию Safari: macOS защищает файл cookie браузера. Разрешение широкое, поэтому включайте его лишь для этой локальной сборки, которой доверяете.",
+                    "It is needed only when you enable the Safari session: macOS protects the browser cookie file. This is broad access, so enable it only for this local app build that you trust."
+                ))
                     .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("Что такое сессия Safari", systemImage: "safari.fill")
+                Label(text("Что такое сессия Safari", "What the Safari session is"), systemImage: "safari.fill")
                     .font(.headline)
-                Text("Это текущий вход в YouTube или Instagram в Safari. При включённой опции cookie не сохраняются и передаются только выбранному сервису для одной загрузки. Они могут помочь, когда сервис просит войти в аккаунт.")
+                Text(text(
+                    "Это текущий вход в YouTube или Instagram в Safari. При включённой опции cookie не сохраняются и передаются только выбранному сервису для одной загрузки. Они могут помочь, когда сервис просит войти в аккаунт.",
+                    "It is your current YouTube or Instagram sign-in in Safari. When enabled, cookies are not saved and are sent only to the selected service for one download. They can help when a service requires you to sign in."
+                ))
                     .foregroundStyle(.secondary)
             }
 
             HStack {
                 Spacer()
-                Button("Понятно") {
+                Button(text("Понятно", "Got it")) {
                     isPresented = false
                 }
                 .keyboardShortcut(.defaultAction)
@@ -243,6 +298,7 @@ private struct PrivacyInfoSheet: View {
 private struct DependencyRow: View {
     let name: String
     let tool: ToolLocation
+    let language: AppLanguage
 
     var body: some View {
         HStack {
@@ -250,7 +306,7 @@ private struct DependencyRow: View {
                 .foregroundStyle(tool.isAvailable ? .green : .orange)
             Text(name)
             Spacer()
-            Text(tool.detail)
+            Text(tool.detail(in: language))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)

@@ -7,18 +7,29 @@ import AppKit
 import Combine
 import SwiftUI
 
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case russian = "ru"
+    case english = "en"
+
+    var id: String { rawValue }
+
+    func text(_ russian: String, _ english: String) -> String {
+        self == .russian ? russian : english
+    }
+}
+
 enum DownloadStage: Equatable {
     case idle
     case preparing
     case downloading
     case converting
 
-    var title: String {
+    func title(in language: AppLanguage) -> String {
         switch self {
         case .idle: ""
-        case .preparing: "Подготовка к загрузке"
-        case .downloading: "Этап 1 из 2 — загрузка видео"
-        case .converting: "Этап 2 из 2 — подготовка для QuickTime"
+        case .preparing: language.text("Подготовка к загрузке", "Preparing download")
+        case .downloading: language.text("Этап 1 из 2 — загрузка видео", "Step 1 of 2 — downloading video")
+        case .converting: language.text("Этап 2 из 2 — подготовка для QuickTime", "Step 2 of 2 — preparing for QuickTime")
         }
     }
 
@@ -35,30 +46,33 @@ enum DownloadFormat: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    func title(in language: AppLanguage) -> String {
         switch self {
-        case .mp4Best: "MP4 — лучшее доступное качество"
-        case .mp4_1080: "MP4 — до 1080p"
-        case .mp4_720: "MP4 — до 720p"
-        case .mp3: "MP3 — только аудио"
+        case .mp4Best: language.text("MP4 — лучшее доступное качество", "MP4 — best available quality")
+        case .mp4_1080: "MP4 — up to 1080p"
+        case .mp4_720: "MP4 — up to 720p"
+        case .mp3: language.text("MP3 — только аудио", "MP3 — audio only")
         }
     }
 
-    var shortTitle: String {
+    func shortTitle(in language: AppLanguage) -> String {
         switch self {
-        case .mp4Best: "MP4 · лучшее"
+        case .mp4Best: language.text("MP4 · лучшее", "MP4 · best")
         case .mp4_1080: "MP4 · 1080p"
         case .mp4_720: "MP4 · 720p"
-        case .mp3: "MP3 · аудио"
+        case .mp3: language.text("MP3 · аудио", "MP3 · audio")
         }
     }
 
-    var helperText: String {
+    func helperText(in language: AppLanguage) -> String {
         switch self {
         case .mp3:
-            "Будет сохранён только звук в MP3."
+            language.text("Будет сохранён только звук в MP3.", "Only the audio will be saved as MP3.")
         default:
-            "MP4 автоматически подготавливается для QuickTime: H.264-видео и AAC-аудио."
+            language.text(
+                "MP4 автоматически подготавливается для QuickTime: H.264-видео и AAC-аудио.",
+                "MP4 is prepared for QuickTime automatically: H.264 video and AAC audio."
+            )
         }
     }
 
@@ -91,9 +105,11 @@ struct ToolLocation: Equatable {
 
     var isAvailable: Bool { url != nil }
 
-    var detail: String {
-        guard let url else { return "Не найден" }
-        return isBundled ? "Встроено в VIDLOAD" : "Готово: \(url.path)"
+    func detail(in language: AppLanguage) -> String {
+        guard let url else { return language.text("Не найден", "Not found") }
+        return isBundled
+            ? language.text("Встроено в VIDLOAD", "Built into VIDLOAD")
+            : language.text("Готово: \(url.path)", "Ready: \(url.path)")
     }
 }
 
@@ -171,6 +187,7 @@ final class DownloadManager: ObservableObject {
     @Published var destinationURL: URL
 
     private let destinationDefaultsKey = "VIDLOAD.destinationURL"
+    private var language: AppLanguage = .russian
     private var process: Process?
     private var pendingOutput = ""
     private var cancellationRequested = false
@@ -192,16 +209,16 @@ final class DownloadManager: ObservableObject {
     }
 
     var statusSymbol: String {
-        if statusMessage.hasPrefix("Готово") { return "checkmark.circle.fill" }
-        if statusMessage.hasPrefix("Ошибка") { return "xmark.octagon.fill" }
-        if statusMessage.hasPrefix("Отменено") { return "minus.circle.fill" }
+        if statusMessage.hasPrefix(language.text("Готово", "Done")) { return "checkmark.circle.fill" }
+        if statusMessage.hasPrefix(language.text("Ошибка", "Error")) { return "xmark.octagon.fill" }
+        if statusMessage.hasPrefix(language.text("Отменено", "Cancelled")) { return "minus.circle.fill" }
         return "info.circle.fill"
     }
 
     var statusColor: Color {
-        if statusMessage.hasPrefix("Готово") { return .green }
-        if statusMessage.hasPrefix("Ошибка") { return .red }
-        if statusMessage.hasPrefix("Отменено") { return .orange }
+        if statusMessage.hasPrefix(language.text("Готово", "Done")) { return .green }
+        if statusMessage.hasPrefix(language.text("Ошибка", "Error")) { return .red }
+        if statusMessage.hasPrefix(language.text("Отменено", "Cancelled")) { return .orange }
         return .secondary
     }
 
@@ -210,14 +227,21 @@ final class DownloadManager: ObservableObject {
         updateReadyMessage()
     }
 
+    func setLanguage(_ language: AppLanguage) {
+        self.language = language
+        if !isDownloading {
+            updateReadyMessage()
+        }
+    }
+
     func chooseDestination() {
         let panel = NSOpenPanel()
-        panel.title = "Выберите папку для загрузок"
+        panel.title = language.text("Выберите папку для загрузок", "Choose a download folder")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
-        panel.prompt = "Выбрать"
+        panel.prompt = language.text("Выбрать", "Choose")
         panel.directoryURL = destinationURL
 
         if panel.runModal() == .OK, let selectedURL = panel.url {
@@ -229,7 +253,7 @@ final class DownloadManager: ObservableObject {
     func copyInstallCommand() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("brew install yt-dlp ffmpeg", forType: .string)
-        statusMessage = "Команда установки скопирована."
+        statusMessage = language.text("Команда установки скопирована.", "Installation command copied.")
     }
 
     func reveal(_ file: URL) {
@@ -247,11 +271,17 @@ final class DownloadManager: ObservableObject {
         guard dependencies.isReady,
               let ytDlpURL = dependencies.ytDlp.url,
               let ffmpegURL = dependencies.ffmpeg.url else {
-            statusMessage = "Ошибка: установите yt-dlp и FFmpeg, затем проверьте инструменты ещё раз."
+            statusMessage = language.text(
+                "Ошибка: установите yt-dlp и FFmpeg, затем проверьте инструменты ещё раз.",
+                "Error: install yt-dlp and FFmpeg, then check the tools again."
+            )
             return
         }
         guard let videoURL = validatedVideoURL(from: rawLink) else {
-            statusMessage = "Ошибка: вставьте действующую публичную ссылку YouTube или Instagram."
+            statusMessage = language.text(
+                "Ошибка: вставьте действующую публичную ссылку YouTube или Instagram.",
+                "Error: paste a valid public YouTube or Instagram link."
+            )
             return
         }
 
@@ -267,14 +297,17 @@ final class DownloadManager: ObservableObject {
         } catch {
             isDownloading = false
             process = nil
-            statusMessage = "Ошибка: не удалось запустить загрузку — \(error.localizedDescription)"
+            statusMessage = language.text(
+                "Ошибка: не удалось запустить загрузку — \(error.localizedDescription)",
+                "Error: could not start the download — \(error.localizedDescription)"
+            )
         }
     }
 
     func cancelDownload() {
         guard isDownloading else { return }
         cancellationRequested = true
-        statusMessage = "Отмена загрузки…"
+        statusMessage = language.text("Отмена загрузки…", "Cancelling download…")
         process?.terminate()
     }
 
@@ -321,9 +354,14 @@ final class DownloadManager: ObservableObject {
         progress = 0
         stage = .preparing
         progressDetail = useSafariCookies
-            ? "Подключаем текущую сессию Safari и проверяем доступные форматы."
-            : "Проверяем доступные форматы видео."
-        statusMessage = useSafariCookies ? "Подключаем сессию Safari…" : "Загрузка началась…"
+            ? language.text(
+                "Подключаем текущую сессию Safari и проверяем доступные форматы.",
+                "Connecting the current Safari session and checking available formats."
+            )
+            : language.text("Проверяем доступные форматы видео.", "Checking available video formats.")
+        statusMessage = useSafariCookies
+            ? language.text("Подключаем сессию Safari…", "Connecting Safari session…")
+            : language.text("Загрузка началась…", "Download started…")
         lastOutputFile = nil
         cancellationRequested = false
         usesSafariCookiesForCurrentDownload = useSafariCookies
@@ -377,7 +415,7 @@ final class DownloadManager: ObservableObject {
 
         if let progressRange = line.range(of: "PROGRESS:") {
             stage = .downloading
-            statusMessage = "Загружаем видео…"
+            statusMessage = language.text("Загружаем видео…", "Downloading video…")
             let fields = line[progressRange.upperBound...].split(separator: "|", omittingEmptySubsequences: false)
             if let rawPercentage = fields.first {
                 let percentage = rawPercentage
@@ -389,13 +427,16 @@ final class DownloadManager: ObservableObject {
             }
             let speed = fields.count > 1 ? fields[1].trimmingCharacters(in: .whitespaces) : ""
             let eta = fields.count > 2 ? fields[2].trimmingCharacters(in: .whitespaces) : ""
-            progressDetail = [speed.isEmpty ? nil : speed, eta.isEmpty ? nil : "осталось \(eta)"]
+            progressDetail = [
+                speed.isEmpty ? nil : speed,
+                eta.isEmpty ? nil : language.text("осталось \(eta)", "\(eta) remaining")
+            ]
                 .compactMap { $0 }
                 .joined(separator: " · ")
         } else if stage == .preparing && (line.contains("[download] Destination:") || line.contains("[download] Downloading")) {
             stage = .downloading
-            statusMessage = "Загружаем видео…"
-            progressDetail = "Получаем данные…"
+            statusMessage = language.text("Загружаем видео…", "Downloading video…")
+            progressDetail = language.text("Получаем данные…", "Receiving data…")
         }
 
         if let fileRange = line.range(of: "FILE:") {
@@ -415,7 +456,7 @@ final class DownloadManager: ObservableObject {
 
         if cancellationRequested {
             stage = .idle
-            statusMessage = "Отменено пользователем."
+            statusMessage = language.text("Отменено пользователем.", "Cancelled by user.")
         } else if exitCode == 0 {
             if currentDownloadNeedsQuickTimeConversion,
                let outputFile = lastOutputFile,
@@ -425,27 +466,48 @@ final class DownloadManager: ObservableObject {
                     try launchQuickTimeConversion(of: outputFile, with: ffmpegURL)
                     return
                 } catch {
-                    statusMessage = "Файл сохранён, но не удалось подготовить его для QuickTime: \(error.localizedDescription)"
+                    statusMessage = language.text(
+                        "Файл сохранён, но не удалось подготовить его для QuickTime: \(error.localizedDescription)",
+                        "The file was saved, but could not be prepared for QuickTime: \(error.localizedDescription)"
+                    )
                     return
                 }
             }
             progress = 1
             stage = .idle
-            statusMessage = "Готово: файл сохранён в выбранную папку."
+            statusMessage = language.text(
+                "Готово: файл сохранён в выбранную папку.",
+                "Done: the file was saved to the selected folder."
+            )
         } else if isSafariCookieAccessDenied() {
             stage = .idle
-            statusMessage = "Ошибка: macOS не разрешила VIDLOAD доступ к cookie Safari. Включите «Полный доступ к диску» для VIDLOAD и перезапустите приложение."
+            statusMessage = language.text(
+                "Ошибка: macOS не разрешила VIDLOAD доступ к cookie Safari. Включите «Полный доступ к диску» для VIDLOAD и перезапустите приложение.",
+                "Error: macOS did not allow VIDLOAD to access Safari cookies. Enable Full Disk Access for VIDLOAD and restart the app."
+            )
         } else if !usesSafariCookiesForCurrentDownload && logLines.joined(separator: " ").localizedCaseInsensitiveContains("rate-limit") {
             stage = .idle
-            statusMessage = "Ошибка: Instagram ограничил анонимный доступ. Включите сессию Safari и повторите попытку."
+            statusMessage = language.text(
+                "Ошибка: Instagram ограничил анонимный доступ. Включите сессию Safari и повторите попытку.",
+                "Error: Instagram limited anonymous access. Enable the Safari session and try again."
+            )
         } else if isYouTubeBotCheck() {
             stage = .idle
             statusMessage = usesSafariCookiesForCurrentDownload
-                ? "Ошибка: YouTube временно ограничил эту сессию. Проверьте вход в YouTube через Safari и повторите попытку позже."
-                : "Ошибка: YouTube запросил вход. Войдите в YouTube через Safari, включите сессию Safari и повторите попытку."
+                ? language.text(
+                    "Ошибка: YouTube временно ограничил эту сессию. Проверьте вход в YouTube через Safari и повторите попытку позже.",
+                    "Error: YouTube temporarily limited this session. Check your YouTube sign-in in Safari and try again later."
+                )
+                : language.text(
+                    "Ошибка: YouTube запросил вход. Войдите в YouTube через Safari, включите сессию Safari и повторите попытку.",
+                    "Error: YouTube requested a sign-in. Sign in to YouTube in Safari, enable the Safari session, and try again."
+                )
         } else {
             stage = .idle
-            statusMessage = "Ошибка: yt-dlp завершился с кодом \(exitCode). Проверьте последние сообщения."
+            statusMessage = language.text(
+                "Ошибка: yt-dlp завершился с кодом \(exitCode). Проверьте последние сообщения.",
+                "Error: yt-dlp exited with code \(exitCode). Check the latest messages."
+            )
         }
     }
 
@@ -504,9 +566,10 @@ final class DownloadManager: ObservableObject {
         conversionSpeed = ""
         progress = 0
         stage = .converting
-        progressDetail = conversionDuration.map { "0:00 из \(formattedDuration($0))" }
-            ?? "Определяем ход обработки…"
-        statusMessage = "Конвертируем для QuickTime…"
+        progressDetail = conversionDuration.map {
+            language.text("0:00 из \(formattedDuration($0))", "0:00 of \(formattedDuration($0))")
+        } ?? language.text("Определяем ход обработки…", "Calculating conversion progress…")
+        statusMessage = language.text("Конвертируем для QuickTime…", "Converting for QuickTime…")
         isDownloading = true
         process = conversionProcess
         do {
@@ -526,14 +589,20 @@ final class DownloadManager: ObservableObject {
         guard !cancellationRequested else {
             try? FileManager.default.removeItem(at: temporaryURL)
             stage = .idle
-            statusMessage = "Отменено пользователем. Исходный файл сохранён."
+            statusMessage = language.text(
+                "Отменено пользователем. Исходный файл сохранён.",
+                "Cancelled by user. The original file was kept."
+            )
             return
         }
 
         guard exitCode == 0, FileManager.default.fileExists(atPath: temporaryURL.path) else {
             try? FileManager.default.removeItem(at: temporaryURL)
             stage = .idle
-            statusMessage = "Файл сохранён, но не удалось подготовить совместимую версию для QuickTime."
+            statusMessage = language.text(
+                "Файл сохранён, но не удалось подготовить совместимую версию для QuickTime.",
+                "The file was saved, but a QuickTime-compatible version could not be prepared."
+            )
             return
         }
 
@@ -542,12 +611,15 @@ final class DownloadManager: ObservableObject {
             lastOutputFile = sourceURL
             progress = 1
             stage = .idle
-            statusMessage = "Готово: MP4 подготовлен для QuickTime."
+            statusMessage = language.text("Готово: MP4 подготовлен для QuickTime.", "Done: MP4 prepared for QuickTime.")
         } catch {
             lastOutputFile = temporaryURL
             progress = 1
             stage = .idle
-            statusMessage = "Готово: совместимая копия сохранена рядом с исходным файлом."
+            statusMessage = language.text(
+                "Готово: совместимая копия сохранена рядом с исходным файлом.",
+                "Done: a compatible copy was saved next to the original file."
+            )
         }
     }
 
@@ -581,9 +653,15 @@ final class DownloadManager: ObservableObject {
         guard conversionProcessedSeconds > 0 else { return }
         if let conversionDuration, conversionDuration > 0 {
             progress = min(conversionProcessedSeconds / conversionDuration, 0.995)
-            progressDetail = "\(formattedDuration(conversionProcessedSeconds)) из \(formattedDuration(conversionDuration))\(conversionSpeed.isEmpty ? "" : " · \(conversionSpeed)")"
+            progressDetail = language.text(
+                "\(formattedDuration(conversionProcessedSeconds)) из \(formattedDuration(conversionDuration))",
+                "\(formattedDuration(conversionProcessedSeconds)) of \(formattedDuration(conversionDuration))"
+            ) + (conversionSpeed.isEmpty ? "" : " · \(conversionSpeed)")
         } else {
-            progressDetail = "Обработано \(formattedDuration(conversionProcessedSeconds))\(conversionSpeed.isEmpty ? "" : " · \(conversionSpeed)")"
+            progressDetail = language.text(
+                "Обработано \(formattedDuration(conversionProcessedSeconds))",
+                "Processed \(formattedDuration(conversionProcessedSeconds))"
+            ) + (conversionSpeed.isEmpty ? "" : " · \(conversionSpeed)")
         }
     }
 
@@ -639,8 +717,11 @@ final class DownloadManager: ObservableObject {
 
     private func updateReadyMessage() {
         statusMessage = dependencies.isReady
-            ? "Инструменты готовы. Вставьте ссылку на публичное видео."
-            : "Нужны yt-dlp и FFmpeg для загрузки."
+            ? language.text(
+                "Инструменты готовы. Вставьте ссылку на публичное видео.",
+                "Tools are ready. Paste a public video link."
+            )
+            : language.text("Нужны yt-dlp и FFmpeg для загрузки.", "yt-dlp and FFmpeg are needed for downloads.")
     }
 
     private func validatedVideoURL(from rawLink: String) -> URL? {
