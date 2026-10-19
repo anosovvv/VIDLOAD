@@ -9,33 +9,53 @@ struct ContentView: View {
     @StateObject private var downloadManager = DownloadManager()
     @State private var link = ""
     @State private var selectedFormat: DownloadFormat = .mp4Best
-    @State private var confirmedPermission = false
     @State private var useSafariSession = false
-    @State private var isPrivacyInfoPresented = true
+    @State private var isPrivacyInfoPresented = false
+    @AppStorage("VIDLOAD.hasSeenPrivacyInfo") private var hasSeenPrivacyInfo = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
 
             Form {
-                Section("Ссылка") {
-                    TextField("Ссылка на публичное видео YouTube или Instagram", text: $link)
-                        .textFieldStyle(.roundedBorder)
-                    Text("Поддерживаются только публичные видео. Приватные материалы и DRM не поддерживаются.")
+                Section("Новая загрузка") {
+                    HStack(spacing: 10) {
+                        TextField("Вставьте ссылку", text: $link)
+                            .textFieldStyle(.roundedBorder)
+
+                        Picker("Формат", selection: $selectedFormat) {
+                            ForEach(DownloadFormat.allCases) { format in
+                                Text(format.shortTitle).tag(format)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 120)
+
+                        downloadButton
+                    }
+
+                    Text("Вставьте ссылку и нажмите «Скачать». Поддерживаются публичные видео YouTube и Instagram.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Text(selectedFormat.helperText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    progressSection
+
+                    HStack {
+                        Button("Проверить инструменты") { downloadManager.refreshDependencies() }
+                            .disabled(downloadManager.isDownloading)
+
+                        if let outputFile = downloadManager.lastOutputFile {
+                            Button("Показать в Finder") { downloadManager.reveal(outputFile) }
+                        }
+                    }
                 }
 
                 Section("Сохранение") {
-                    Picker("Формат", selection: $selectedFormat) {
-                        ForEach(DownloadFormat.allCases) { format in
-                            Text(format.title).tag(format)
-                        }
-                    }
-                    Text("MP4 автоматически подготавливается для QuickTime: H.264-видео и AAC-аудио.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Папка загрузки")
@@ -50,51 +70,11 @@ struct ContentView: View {
                     }
                 }
 
-                Section("Разрешение") {
-                    Toggle("У меня есть право скачать этот материал", isOn: $confirmedPermission)
-                    Text("Скачивайте только собственные материалы или материалы, для которых у вас есть разрешение, и соблюдайте правила сервиса.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
                 Section("Сессия Safari") {
                     Toggle("Использовать текущую сессию Safari", isOn: $useSafariSession)
                     Text("Опция используется только для YouTube и Instagram. Cookie из Safari не сохраняются и передаются только соответствующему сервису через yt-dlp для этой загрузки.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-
-                Section("Загрузка") {
-                    progressSection
-
-                    HStack {
-                        Button {
-                            if downloadManager.isDownloading {
-                                downloadManager.cancelDownload()
-                            } else {
-                                downloadManager.startDownload(
-                                    link: link,
-                                    format: selectedFormat,
-                                    permissionConfirmed: confirmedPermission,
-                                    useSafariSession: useSafariSession
-                                )
-                            }
-                        } label: {
-                            Label(
-                                downloadManager.isDownloading ? "Отменить" : "Скачать",
-                                systemImage: downloadManager.isDownloading ? "stop.fill" : "arrow.down.circle.fill"
-                            )
-                        }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(!downloadManager.isDownloading && !downloadManager.dependencies.isReady)
-
-                        Button("Проверить инструменты") { downloadManager.refreshDependencies() }
-                            .disabled(downloadManager.isDownloading)
-
-                        if let outputFile = downloadManager.lastOutputFile {
-                            Button("Показать в Finder") { downloadManager.reveal(outputFile) }
-                        }
-                    }
                 }
 
                 Section("Инструменты") {
@@ -131,11 +111,36 @@ struct ContentView: View {
         .frame(minWidth: 720, minHeight: 610)
         .onAppear {
             downloadManager.refreshDependencies()
-            isPrivacyInfoPresented = true
+            if !hasSeenPrivacyInfo {
+                isPrivacyInfoPresented = true
+            }
         }
-        .sheet(isPresented: $isPrivacyInfoPresented) {
+        .sheet(isPresented: $isPrivacyInfoPresented, onDismiss: {
+            hasSeenPrivacyInfo = true
+        }) {
             PrivacyInfoSheet(isPresented: $isPrivacyInfoPresented)
         }
+    }
+
+    private var downloadButton: some View {
+        Button {
+            if downloadManager.isDownloading {
+                downloadManager.cancelDownload()
+            } else {
+                downloadManager.startDownload(
+                    link: link,
+                    format: selectedFormat,
+                    useSafariSession: useSafariSession
+                )
+            }
+        } label: {
+            Label(
+                downloadManager.isDownloading ? "Отменить" : "Скачать",
+                systemImage: downloadManager.isDownloading ? "stop.fill" : "arrow.down.circle.fill"
+            )
+        }
+        .keyboardShortcut(.defaultAction)
+        .disabled(!downloadManager.isDownloading && !downloadManager.dependencies.isReady)
     }
 
     private var header: some View {
@@ -204,7 +209,7 @@ private struct PrivacyInfoSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Что скачивает VIDLOAD", systemImage: "arrow.down.circle.fill")
                     .font(.headline)
-                Text("Только материалы по вставленной вами публичной ссылке — и только после подтверждения, что у вас есть право на загрузку.")
+                Text("Только материалы по вставленной вами публичной ссылке. Скачивайте собственные материалы или материалы, на которые у вас есть разрешение.")
                     .foregroundStyle(.secondary)
             }
 

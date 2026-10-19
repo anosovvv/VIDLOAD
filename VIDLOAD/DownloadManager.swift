@@ -44,6 +44,24 @@ enum DownloadFormat: String, CaseIterable, Identifiable {
         }
     }
 
+    var shortTitle: String {
+        switch self {
+        case .mp4Best: "MP4 · лучшее"
+        case .mp4_1080: "MP4 · 1080p"
+        case .mp4_720: "MP4 · 720p"
+        case .mp3: "MP3 · аудио"
+        }
+    }
+
+    var helperText: String {
+        switch self {
+        case .mp3:
+            "Будет сохранён только звук в MP3."
+        default:
+            "MP4 автоматически подготавливается для QuickTime: H.264-видео и AAC-аудио."
+        }
+    }
+
     var ytDlpArguments: [String] {
         switch self {
         case .mp4Best:
@@ -221,16 +239,11 @@ final class DownloadManager: ObservableObject {
     func startDownload(
         link rawLink: String,
         format: DownloadFormat,
-        permissionConfirmed: Bool,
         useSafariSession: Bool
     ) {
         guard !isDownloading else { return }
         refreshDependencies()
 
-        guard permissionConfirmed else {
-            statusMessage = "Ошибка: подтвердите право на скачивание материала."
-            return
-        }
         guard dependencies.isReady,
               let ytDlpURL = dependencies.ytDlp.url,
               let ffmpegURL = dependencies.ffmpeg.url else {
