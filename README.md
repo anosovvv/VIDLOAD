@@ -1,5 +1,16 @@
 # VIDLOAD
 
+## English
+
+VIDLOAD is a compact macOS app for saving permitted public YouTube and
+Instagram videos to your Mac. It can save video as a QuickTime-compatible MP4
+or extract audio as MP3. Homebrew, yt-dlp, and FFmpeg are included inside the
+application, so no Terminal setup is required.
+
+The Russian installation guide and privacy notes follow below.
+
+## Русский
+
 Небольшое приложение для macOS, которое сохраняет **разрешённые публичные** видео с YouTube и Instagram в папку на Mac.
 
 VIDLOAD не поддерживает приватные материалы, DRM и обход ограничений сервисов. 
