@@ -4,8 +4,20 @@
 
 VIDLOAD is a compact macOS app for saving permitted public YouTube and
 Instagram videos to your Mac. It can save video as a QuickTime-compatible MP4
-or extract audio as MP3. Homebrew, yt-dlp, and FFmpeg are included inside the
-application, so no Terminal setup is required.
+or extract audio as MP3. yt-dlp, FFmpeg, and Deno are included inside the
+application. Homebrew and Terminal setup are not required.
+
+### Install or update
+
+1. Download `VIDLOAD-1.1.1-macOS.zip` from [Releases](../../releases/latest).
+2. Quit VIDLOAD, unzip the download, and move `VIDLOAD.app` to Applications,
+   replacing the previous version if installed.
+3. Open VIDLOAD from Finder or Spotlight. Requires macOS 14 or later, Intel or Apple Silicon.
+
+Version 1.1.1 fixes YouTube JavaScript challenge failures, updates yt-dlp to
+2026.10.26, and bundles Deno 2.9.8 for both Mac architectures.
+The app has no Developer ID signature and is not notarized, so macOS may
+ask you to approve it in System Settings → Privacy & Security.
 
 The Russian installation guide and privacy notes follow below.
 
@@ -22,6 +34,14 @@ VIDLOAD не поддерживает приватные материалы, DRM
 3. Запустите приложение через Finder или Spotlight.
 
 Homebrew, `yt-dlp` и FFmpeg устанавливать отдельно **не нужно**: нужные версии уже находятся внутри `VIDLOAD.app`.
+
+## Что нового в 1.1.1
+
+- исправлена загрузка YouTube при ошибках обработки JavaScript;
+- встроенный yt-dlp обновлён до 2026.10.26;
+- добавлен Deno 2.9.8 для Apple Silicon и Intel — отдельно устанавливать его не нужно.
+
+Для обновления закройте VIDLOAD, распакуйте новый архив и замените приложение в папке «Программы».
 
 ## Что нового в 1.1.0
 
@@ -53,4 +73,4 @@ MP4-файлы после скачивания дополнительно под
 
 ## Компоненты с открытым исходным кодом
 
-Релиз включает `yt-dlp` и FFmpeg как отдельные исполняемые процессы. Сведения о версиях, лицензиях и исходниках — в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Их копии также помещены внутрь релизного приложения.
+Релиз включает `yt-dlp`, FFmpeg и Deno как отдельные исполняемые процессы. Сведения о версиях, лицензиях и исходниках — в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Их копии также помещены внутрь релизного приложения.

@@ -4,9 +4,16 @@ VIDLOAD 1.0.0 includes the following unmodified command-line components as separ
 
 ## yt-dlp
 
-- Version: 2026.08.19
+- Version: 2026.10.26
 - Source and releases: https://github.com/yt-dlp/yt-dlp
 - License: The Unlicense
+
+## Deno
+
+- Version: 2.9.8
+- Source and releases: https://github.com/denoland/deno
+- License: MIT; included in `VIDLOADTools.bundle/DENO-LICENSE.md`.
+- Runs yt-dlp's bundled YouTube JavaScript challenge solver.
 
 ## FFmpeg
 

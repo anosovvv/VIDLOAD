@@ -139,6 +139,11 @@ struct DependencyStatus: Equatable {
         #endif
     }
 
+    static var javaScriptRuntime: URL? {
+        bundledTool(named: "deno", pathComponents: [bundledArchitecture, "bin", "deno"])?.url
+            ?? findExecutable(named: "deno")
+    }
+
     private static func bundledTool(named name: String, pathComponents: [String]) -> ToolLocation? {
         // The tools live in a nested .bundle so Xcode preserves the FFmpeg
         // executables' adjacent dynamic libraries instead of flattening them.
@@ -334,6 +339,9 @@ final class DownloadManager: ObservableObject {
             "--print", "after_move:FILE:%(filepath)s",
             "-o", outputTemplate
         ]
+        if let runtime = DependencyStatus.javaScriptRuntime {
+            arguments += ["--js-runtimes", "deno:\(runtime.path)"]
+        }
         if useSafariCookies {
             arguments += ["--cookies-from-browser", "safari"]
         }
